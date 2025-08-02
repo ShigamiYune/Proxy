@@ -14,9 +14,18 @@ constexpr std::ptrdiff_t offset_of(Member Class::* memberPtr) {
 
 template <typename ProxyType, typename Class, typename Member>
 Class* get_class_ptr_from_proxy(ProxyType* proxy_ptr, Member Class::* memberPtr) {
+    auto offset = offset_of(memberPtr);
     return reinterpret_cast<Class*>(
-        reinterpret_cast<char*>(proxy_ptr) - offset_of(memberPtr)
-        );
+        reinterpret_cast<char*>(proxy_ptr) - offset
+    );
+}
+
+template <typename ProxyType, typename Class, typename Member>
+const Class* get_class_ptr_from_proxy(const ProxyType* proxy_ptr, Member Class::* memberPtr) {
+    auto offset = offset_of(memberPtr);
+    return reinterpret_cast<const Class*>(
+        reinterpret_cast<const char*>(proxy_ptr) - offset
+    );
 }
 
 template <typename T, typename Derived>
@@ -80,14 +89,15 @@ public:
         return old;
     }
 
-    operator T() const { return self().get(); }
+    operator T() { return self().get(); }
 
     friend std::ostream& operator<<(std::ostream& os, const ProxyOps& p) {
         return os << p.get();
     }
 
     T& get_data() { return data; }
-    void set_data(const T& value) { return data = value; }
+    const T get_data() const { return data; }
+    void set_data(const T& value) { data = value; }
 
 protected:
     inline Derived& self() { return static_cast<Derived&>(*this); }
@@ -98,14 +108,17 @@ protected:
 #define DGET(NAME) {return NAME.get_data();}
 #define DSET(NAME) {NAME.set_data(value);}
 
-#define Proxy(TYPE, NAME, CLASS, GET, SET, INITIAL)                                   \
-    struct : public ProxyOps<TYPE, decltype(*this)> {                                 \
-        CLASS* get_class_ptr() {return get_class_ptr_from_proxy(this, &CLASS::NAME);}\
-        TYPE& operator()() { return get_class_ptr()->get##NAME##CLASS(); }            \
-        TYPE& operator->() { return get_class_ptr()->get##NAME##CLASS(); }            \
-        TYPE& get() { return get_class_ptr()->get##NAME(); }                          \
-        void set(const TYPE& value) { get_class_ptr()->set##NAME(value); }            \
-    } NAME = decltype(NAME){INITIAL};                                                 \
-    private: TYPE& get##NAME() GET void set##NAME(TYPE value) SET
+
+#define Proxy(TYPE, NAME, CLASS, GET, SET, INITIAL)                                                                 \
+    struct TYPE##_##NAME##CLASS : public ProxyOps<TYPE, TYPE##_##NAME##CLASS> {                                     \
+        TYPE##_##NAME##CLASS(const TYPE& value) { data = value;}                                                    \
+        CLASS* get_class_ptr() {return get_class_ptr_from_proxy(this, &CLASS::NAME);}                               \
+        const CLASS* get_class_ptr() const {return get_class_ptr_from_proxy(this, &CLASS::NAME);}                   \
+        TYPE operator()() { return get_class_ptr()->get##NAME##CLASS(); }                                           \
+        TYPE* operator->() { return &get_class_ptr()->get##NAME##CLASS(); }                                         \
+        TYPE get() { return get_class_ptr()->get##NAME##CLASS(); }                                                  \
+        void set(const TYPE& value) { get_class_ptr()->set##NAME##CLASS(value); }                                   \
+    } NAME = TYPE##_##NAME##CLASS(INITIAL);                                                                         \
+    private: TYPE& get##NAME##CLASS() GET void set##NAME##CLASS(TYPE value) SET
 
 #endif 
