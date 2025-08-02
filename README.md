@@ -56,6 +56,7 @@ toán tử -> : có chức năng tương tự như get()
 
 
 set_data() : là hàm gán trực tiếp dữ liệu mới vào dữ liệu nguyên gốc (chưa áp dụng logic setter)
+
 set() : là hàm sẽ trả về dữ liệu sau khi áp dụng logic getter
 
 nhược điểm:
